@@ -4,7 +4,7 @@ name: Build Debug APK
 # from the "Actions" tab on GitHub ("Run workflow" button).
 on:
   push:
-    branches: [ "main" ]
+    branches: [ "master" ]
   workflow_dispatch: {}
 
 jobs:
