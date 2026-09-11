@@ -13,7 +13,3 @@
 .externalNativeBuild
 .cxx
 local.properties
-
-# Firebase - DO NOT COMMIT your real config publicly if repo is public
-# Remove the line below if your repo is private and you want google-services.json tracked
-app/google-services.json

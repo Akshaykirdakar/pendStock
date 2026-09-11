@@ -1,5 +1,8 @@
 package com.pendshop.stockmanager.ui.screens.catalogue
 
+import android.net.Uri
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -10,18 +13,17 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavHostController
+import coil.compose.AsyncImage
 import com.pendshop.stockmanager.data.model.Brand
 import com.pendshop.stockmanager.data.model.Product
+import com.pendshop.stockmanager.util.StorageUploader
 import com.pendshop.stockmanager.viewmodel.CatalogueViewModel
+import kotlinx.coroutines.launch
 
-/**
- * Add a new product to the catalogue. Photo upload to Firebase Storage is left as a
- * clearly-marked TODO — wire it to your preferred image picker + Storage upload call,
- * then set photoUrl before calling vm.saveProduct(...).
- */
 @Composable
 fun AddEditProductScreen(navController: NavHostController, vm: CatalogueViewModel = viewModel()) {
     val brands by vm.brands.collectAsState()
+    val coroutineScope = rememberCoroutineScope()
 
     var selectedBrand by remember { mutableStateOf<Brand?>(null) }
     var newBrandName by remember { mutableStateOf("") }
@@ -30,8 +32,27 @@ fun AddEditProductScreen(navController: NavHostController, vm: CatalogueViewMode
     var fullBagPrice by remember { mutableStateOf("") }
     var perKgPrice by remember { mutableStateOf("") }
     var lowStockThreshold by remember { mutableStateOf("5") }
-    // TODO: replace with real Firebase Storage URL once photo upload is wired up
-    var photoUrl by remember { mutableStateOf("") }
+
+    var localPhotoUri by remember { mutableStateOf<Uri?>(null) }
+    var uploadedPhotoUrl by remember { mutableStateOf("") }
+    var isUploading by remember { mutableStateOf(false) }
+    var isSaving by remember { mutableStateOf(false) }
+
+    val photoPickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetContent()
+    ) { uri: Uri? ->
+        if (uri != null) {
+            localPhotoUri = uri
+            isUploading = true
+            coroutineScope.launch {
+                try {
+                    uploadedPhotoUrl = StorageUploader.uploadProductPhoto(uri)
+                } finally {
+                    isUploading = false
+                }
+            }
+        }
+    }
 
     Scaffold(topBar = { TopAppBar(title = { Text("Add Product") }) }) { padding ->
         Column(
@@ -74,25 +95,41 @@ fun AddEditProductScreen(navController: NavHostController, vm: CatalogueViewMode
             OutlinedTextField(value = perKgPrice, onValueChange = { perKgPrice = it }, label = { Text("Per-kg price (₹)") }, modifier = Modifier.fillMaxWidth())
             OutlinedTextField(value = lowStockThreshold, onValueChange = { lowStockThreshold = it }, label = { Text("Low stock alert threshold (bags)") }, modifier = Modifier.fillMaxWidth())
 
+            Text("Product Photo", style = MaterialTheme.typography.titleSmall)
+            if (localPhotoUri != null) {
+                AsyncImage(model = localPhotoUri, contentDescription = "Selected photo", modifier = Modifier.fillMaxWidth().height(160.dp))
+            }
+            OutlinedButton(onClick = { photoPickerLauncher.launch("image/*") }, modifier = Modifier.fillMaxWidth()) {
+                Text(if (localPhotoUri == null) "Choose Photo" else "Change Photo")
+            }
+            if (isUploading) {
+                LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+                Text("Uploading photo...", style = MaterialTheme.typography.labelSmall)
+            }
+
             Button(
                 onClick = {
                     val brand = selectedBrand ?: return@Button
+                    isSaving = true
                     val product = Product(
                         brandId = brand.id,
                         brandName = brand.name,
                         name = productName,
                         bagWeightKg = bagWeight.toDoubleOrNull() ?: 0.0,
-                        photoUrl = photoUrl,
+                        photoUrl = uploadedPhotoUrl,
                         fullBagPrice = fullBagPrice.toDoubleOrNull() ?: 0.0,
                         perKgPrice = perKgPrice.toDoubleOrNull() ?: 0.0,
                         lowStockThreshold = lowStockThreshold.toIntOrNull() ?: 5
                     )
-                    vm.saveProduct(product) { navController.popBackStack() }
+                    vm.saveProduct(product) {
+                        isSaving = false
+                        navController.popBackStack()
+                    }
                 },
                 modifier = Modifier.fillMaxWidth(),
-                enabled = selectedBrand != null && productName.isNotBlank()
+                enabled = selectedBrand != null && productName.isNotBlank() && !isUploading && !isSaving
             ) {
-                Text("Save Product & Generate QR")
+                Text(if (isSaving) "Saving..." else "Save Product & Generate QR")
             }
         }
     }

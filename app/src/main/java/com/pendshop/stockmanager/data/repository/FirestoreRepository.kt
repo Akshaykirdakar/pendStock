@@ -18,6 +18,7 @@ class FirestoreRepository {
     private val stockRef = db.collection("stock")
     private val stockLogsRef = db.collection("stockLogs")
     private val billsRef = db.collection("bills")
+    private val countersRef = db.collection("counters").document("billCounter")
 
     // ---------- Brands ----------
 
@@ -105,16 +106,28 @@ class FirestoreRepository {
         customerName: String,
         paymentMode: PaymentMode,
         items: List<BillItem>
-    ): String {
+    ): Pair<String, Long> {
         val billDocRef = billsRef.document()
         val totalAmount = items.sumOf { it.lineTotal }
+        var assignedBillNumber = 0L
 
         db.runTransaction { txn ->
-            // 1. Validate & deduct stock for every line item first
+            // ---- All reads must happen before any writes in a Firestore transaction ----
+            val counterSnap = txn.get(countersRef)
+            val nextBillNumber = (counterSnap.getLong("lastBillNumber") ?: 0L) + 1
+
+            val stockSnapshots = items.associate { item ->
+                item.productId to txn.get(stockRef.document(item.productId))
+            }
+
+            // ---- Now perform writes ----
+            assignedBillNumber = nextBillNumber
+            txn.set(countersRef, mapOf("lastBillNumber" to nextBillNumber))
+
             for (item in items) {
                 val stockDocRef = stockRef.document(item.productId)
-                val stockSnap = txn.get(stockDocRef)
-                var stock = stockSnap.toObject(Stock::class.java) ?: Stock(productId = item.productId)
+                var stock = stockSnapshots[item.productId]?.toObject(Stock::class.java)
+                    ?: Stock(productId = item.productId)
 
                 when (SaleType.valueOf(item.saleType)) {
                     SaleType.BAG -> {
@@ -125,15 +138,8 @@ class FirestoreRepository {
                         stock = stock.copy(bagsRemaining = stock.bagsRemaining - bagsNeeded)
                     }
                     SaleType.KG -> {
-                        var kgNeeded = item.quantityOrWeight
-                        // Open new bags one at a time if loose stock is insufficient
-                        while (stock.looseKgRemaining < kgNeeded) {
-                            if (stock.bagsRemaining <= 0) {
-                                throw IllegalStateException("Not enough stock (bags+loose) for ${item.productName}")
-                            }
-                            // NOTE: bag weight isn't stored on Stock; caller should pass a
-                            // product with correct bagWeightKg-based conversion beforehand
-                            // in a production build. Simplified here for clarity.
+                        val kgNeeded = item.quantityOrWeight
+                        if (stock.looseKgRemaining < kgNeeded) {
                             throw IllegalStateException(
                                 "Insufficient loose stock for ${item.productName}. " +
                                 "Open a bag manually first via Stock screen, then retry checkout."
@@ -152,29 +158,27 @@ class FirestoreRepository {
                         productId = item.productId,
                         type = StockLogType.SALE.name,
                         quantity = item.quantityOrWeight,
-                        note = "Bill ${billDocRef.id}"
+                        note = "Bill #$nextBillNumber (${billDocRef.id})"
                     )
                 )
             }
 
-            // 2. Write the bill document
             val bill = Bill(
                 id = billDocRef.id,
-                billNumber = System.currentTimeMillis(), // simple monotonic-ish number; replace with a counter doc for sequential numbers
+                billNumber = nextBillNumber,
                 customerName = customerName,
                 totalAmount = totalAmount,
                 paymentMode = paymentMode.name
             )
             txn.set(billDocRef, bill)
 
-            // 3. Write each bill item into the bill's subcollection
             for (item in items) {
                 val itemDoc = billDocRef.collection("billItems").document()
                 txn.set(itemDoc, item.copy(id = itemDoc.id))
             }
         }.await()
 
-        return billDocRef.id
+        return billDocRef.id to assignedBillNumber
     }
 
     /** Explicit "open a bag" action from the Stock screen: converts 1 bag into loose kg. */

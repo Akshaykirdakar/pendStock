@@ -6,12 +6,26 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavHostController
+import com.pendshop.stockmanager.viewmodel.AuthViewModel
 
 @Composable
-fun HomeScreen(navController: NavHostController) {
+fun HomeScreen(navController: NavHostController, authVm: AuthViewModel = viewModel()) {
     Scaffold(
-        topBar = { TopAppBar(title = { Text("Pend Shop") }) }
+        topBar = {
+            TopAppBar(
+                title = { Text("Pend Shop") },
+                actions = {
+                    TextButton(onClick = {
+                        authVm.logout()
+                        navController.navigate(Routes.LOGIN) {
+                            popUpTo(0)
+                        }
+                    }) { Text("Logout") }
+                }
+            )
+        }
     ) { padding ->
         Column(
             modifier = Modifier
@@ -31,6 +45,9 @@ fun HomeScreen(navController: NavHostController) {
             }
             Button(onClick = { navController.navigate(Routes.CATALOGUE) }, modifier = Modifier.fillMaxWidth()) {
                 Text("Catalogue (Brands & Products)")
+            }
+            Button(onClick = { navController.navigate(Routes.QR_CATALOGUE) }, modifier = Modifier.fillMaxWidth()) {
+                Text("Print QR Catalogue")
             }
             Button(onClick = { navController.navigate(Routes.STOCK) }, modifier = Modifier.fillMaxWidth()) {
                 Text("Stock Dashboard")

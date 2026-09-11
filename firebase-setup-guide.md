@@ -30,14 +30,28 @@ Follow these steps in order. This app uses **Firestore** (database), **Firebase 
 
 1. Firebase will offer a `google-services.json` file to download.
 2. **Replace** the placeholder file at `app/google-services.json` in this project with
-   the real one you just downloaded (delete the placeholder, put the real file in the
-   exact same location: `app/google-services.json`).
-3. This file contains your project's API keys and IDs — the app will not connect to
-   Firebase without the real version.
+   the real one you just downloaded.
 
-> ⚠️ If your Git repo is **public**, don't commit the real `google-services.json` with
-> production keys — the `.gitignore` in this project already excludes it by default.
-> If your repo is private, you can remove that line from `.gitignore` to track it.
+### If you're not using Android Studio/local git — replace it directly on GitHub:
+
+1. Go to your repo on GitHub in the browser.
+2. Navigate into the `app` folder, click on `google-services.json`.
+3. Click the **pencil (Edit)** icon in the top-right of the file view.
+4. Delete all the placeholder content, then open your downloaded
+   `google-services.json` in any text editor (Notepad, VS Code, etc.), copy its
+   entire contents, and paste it into the GitHub editor box.
+5. Scroll down, add a commit message like "Add real Firebase config", and click
+   **Commit changes** directly to the `main` branch.
+6. This will automatically trigger a new GitHub Actions build (per the workflow
+   in this repo) using your real Firebase project.
+
+> ⚠️ If your repo is **public**, anyone can see this file's contents once
+> committed this way (API keys included). For a personal/testing project this
+> is usually fine — Firebase API keys aren't secret credentials in the way a
+> password is, and your actual data stays protected by the Firestore/Storage
+> **rules** you set up in Steps 4–5 below, not by hiding this file. If you want
+> extra caution anyway, make the GitHub repo **private** (Settings → General →
+> Danger Zone → Change visibility).
 
 ---
 
@@ -73,10 +87,9 @@ Follow these steps in order. This app uses **Firestore** (database), **Firebase 
 4. Under the **Users** tab, manually add the shop owner's login (email + password) —
    this is the account used to sign in on the counter device.
 
-> The current app code doesn't yet include a login screen — Firestore/Storage rules
-> above require `request.auth != null`, so you'll need to add a simple sign-in step
-> (Firebase Auth's `signInWithEmailAndPassword`) before the app can read/write data.
-> This is a natural next task — flag it if you want it built out.
+> The app now includes a Login screen — sign in with the email/password account you
+> create in Step 6's **Users** tab. Only signed-in users can read/write Firestore
+> and Storage, per the rules above.
 
 ---
 
@@ -111,22 +124,23 @@ by hand through the app:
 
 ## 9. What's Already Built vs. What's Left
 
-**Built (functional skeleton):**
+**Built (functional):**
 - Data models, Firestore repository, atomic checkout transaction with stock deduction
+- **Firebase Auth login screen** (email/password) — app now requires sign-in before showing any data, matching the Firestore/Storage rules
 - Catalogue: add brand, add product (auto-generates QR code string = product ID)
+- **Product photo picker + Firebase Storage upload**, wired into Add Product
+- **QR Catalogue screen**: view every product's QR with photo/price, and share/print each one (via Android's share sheet — works with WhatsApp, Drive, or any installed printer app)
 - QR scan via CameraX + ML Kit → Product Detail screen
 - Product Detail: full-bag or by-kg sale, **editable price with override flag**
 - Cart: multi-item, remove line, checkout with customer name + payment mode
+- **Sequential human-friendly bill numbers** (via a Firestore counter document, incremented atomically inside the checkout transaction)
+- **Receipt sharing** after checkout — plain-text receipt shareable via WhatsApp/SMS/any print app
 - Stock Dashboard: low-stock alert banner, manual "+10 bags" and "open 1 bag" actions
 - Today's Reports screen (total sales + bill list)
 
 **Left to build (natural next steps):**
-- Login screen (Firebase Auth email/password)
-- Product photo picker + Storage upload (currently a `TODO` in `AddEditProductScreen.kt`)
-- Printable/shareable QR catalogue sheet (grid of QR + photo + name)
-- Proper "Add Stock" dialog (currently hardcoded to +10 bags for quick testing)
-- Bill receipt printing (Bluetooth thermal printer SDK integration)
-- Sequential human-friendly bill numbers (currently uses a timestamp — fine for
-  uniqueness, but swap in a Firestore counter document for "Bill #1, #2, #3…")
-- Multi-staff roles/permissions (admin vs. staff), if confirmed needed
+- Dedicated Bluetooth thermal-printer SDK integration for hardware receipt printers (current receipt sharing uses Android's generic share sheet, which works with most printer apps but isn't a direct ESC/POS print)
+- Proper "Add Stock" dialog with a quantity input (currently hardcoded to +10 bags for quick testing)
+- Multi-staff roles/permissions (admin vs. staff) — currently any signed-in Firebase Auth user has full access
 - Customer credit/khata ledger, if confirmed needed
+- Automatic "open a bag" during a KG sale when loose stock is insufficient (currently requires the staff to manually open a bag first via the Stock screen, then retry checkout)

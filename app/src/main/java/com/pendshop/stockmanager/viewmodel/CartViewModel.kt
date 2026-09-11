@@ -16,6 +16,11 @@ class CartViewModel(
 
     val items: StateFlow<List<BillItem>> = cart.items
 
+    var lastReceiptItems: List<BillItem> = emptyList()
+        private set
+    var lastReceiptTotal: Double = 0.0
+        private set
+
     fun addItem(item: BillItem) = cart.addItem(item)
     fun removeItem(itemId: String) = cart.removeItem(itemId)
     fun updateItem(item: BillItem) = cart.updateItem(item)
@@ -24,7 +29,7 @@ class CartViewModel(
     fun checkout(
         customerName: String,
         paymentMode: PaymentMode,
-        onSuccess: (String) -> Unit,
+        onSuccess: (billId: String, billNumber: Long) -> Unit,
         onError: (String) -> Unit
     ) {
         val currentItems = items.value
@@ -34,9 +39,11 @@ class CartViewModel(
         }
         viewModelScope.launch {
             try {
-                val billId = repo.checkoutBill(customerName, paymentMode, currentItems)
+                val (billId, billNumber) = repo.checkoutBill(customerName, paymentMode, currentItems)
+                lastReceiptItems = currentItems
+                lastReceiptTotal = currentItems.sumOf { it.lineTotal }
                 cart.clear()
-                onSuccess(billId)
+                onSuccess(billId, billNumber)
             } catch (e: Exception) {
                 onError(e.message ?: "Checkout failed")
             }

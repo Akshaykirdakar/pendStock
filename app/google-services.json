@@ -1,0 +1,22 @@
+{
+  "_comment": "PLACEHOLDER FILE - Replace this entire file with the real google-services.json you download from the Firebase Console (Project Settings > Your apps > Android app). See firebase-setup-guide.md for step-by-step instructions. The app will NOT build/run correctly with this placeholder.",
+  "project_info": {
+    "project_number": "REPLACE_ME",
+    "project_id": "REPLACE_ME",
+    "storage_bucket": "REPLACE_ME.appspot.com"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "REPLACE_ME",
+        "android_client_info": {
+          "package_name": "com.pendshop.stockmanager"
+        }
+      },
+      "api_key": [
+        { "current_key": "REPLACE_ME" }
+      ]
+    }
+  ],
+  "configuration_version": "1"
+}
